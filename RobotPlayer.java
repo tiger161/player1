@@ -24,13 +24,13 @@ public class RobotPlayer{
 	while(true){
 		try {
 			if(rc.getType()==RobotType.HQ){
-				makeDead(rc);
+				makeWeakDead(rc);
 				if(Clock.getRoundNum()<500){
 					spawnUnit(rc, Direction.NORTH, RobotType.BEAVER);
 				}
 			}
 			else if(rc.getType()==RobotType.BEAVER && role == 0){
-				makeDead(rc);
+				makeWeakDead(rc);
 				if (rc.senseOre(rc.getLocation())>1&&rc.getLocation().distanceSquaredTo(rc.senseHQLocation())>4+(int)(Clock.getRoundNum()/50)){
 					rc.mine();
 				}
@@ -38,24 +38,36 @@ public class RobotPlayer{
 			}
 			
 			else if (rc.getType()==RobotType.BEAVER && role == 1){
-				makeDead(rc);
-				if(Clock.getRoundNum()<300&&rc.getLocation().distanceSquaredTo(rc.senseHQLocation())>4+(int)(Clock.getRoundNum()/50)){
-					buildUnit(rc, Direction.values()[(int)(rand.nextInt(8))], RobotType.MINERFACTORY);
+				makeWeakDead(rc);
+				if(Clock.getRoundNum()<=1200){
+					if(Clock.getRoundNum()<300&&rc.getLocation().distanceSquaredTo(rc.senseHQLocation())>4+(int)(Clock.getRoundNum()/50)){
+						buildUnit(rc, Direction.values()[(int)(rand.nextInt(8))], RobotType.MINERFACTORY);
+					}
+					if (Clock.getRoundNum()>=300&&rc.getLocation().distanceSquaredTo(rc.senseHQLocation())>4+(int)(Clock.getRoundNum()/50)){
+						buildUnit(rc, Direction.values()[(int)(rand.nextInt(8))], RobotType.BARRACKS);
+					}
+					if(rc.getLocation().distanceSquaredTo(rc.senseHQLocation())<20){
+						randMove(rc);
+					}				
+					else if(rc.isCoreReady() && rc.canMove(rc.getLocation().directionTo(rc.senseHQLocation()))){
+							rc.move((rc.getLocation().directionTo(rc.senseHQLocation())));
+					}
 				}
-				else if (Clock.getRoundNum()>=300&&rc.getLocation().distanceSquaredTo(rc.senseHQLocation())>4+(int)(Clock.getRoundNum()/50)){
-					buildUnit(rc, Direction.values()[(int)(rand.nextInt(8))], RobotType.BARRACKS);
-				}
-				
-				if(rc.getLocation().distanceSquaredTo(rc.senseHQLocation())<20){
-					randMove(rc);
-				}				
-				else if(rc.isCoreReady() && rc.canMove(rc.getLocation().directionTo(rc.senseHQLocation()))){
-						rc.move((rc.getLocation().directionTo(rc.senseHQLocation())));
+				else{
+					if(rc.getLocation().distanceSquaredTo(rc.senseEnemyHQLocation())>500){
+						safeMoveTowards(rc, rc.senseEnemyHQLocation());
+					}
+					else{
+						randMove(rc);
+					}
+					if(rand.nextDouble() < 0.1){
+						buildUnit(rc,Direction.values()[(int)(rand.nextInt(8))], RobotType.SUPPLYDEPOT);
+					}
 				}
 			}
 			
 			else if(rc.getType()==RobotType.MINER){
-				makeDead(rc);
+				makeWeakDead(rc);
 				if (rc.senseOre(rc.getLocation())>1&&rc.getLocation().distanceSquaredTo(rc.senseHQLocation())>4){
 					rc.mine();
 				}
@@ -69,18 +81,20 @@ public class RobotPlayer{
 			}
 			
 			else if(rc.getType()==RobotType.BARRACKS){
-				spawnUnit(rc, Direction.NORTH, RobotType.SOLDIER);
+				if (rc.getTeamOre()> RobotType.SOLDIER.oreCost+RobotType.SUPPLYDEPOT.oreCost){
+					spawnUnit(rc, Direction.NORTH, RobotType.SOLDIER);
+				}
 			}
 			
 			else if(rc.getType() == RobotType.TOWER){
-				makeDead(rc);
+				makeWeakDead(rc);
 			}
 			
 			else if(rc.getType() == RobotType.SOLDIER){
-				makeDead(rc);
+				makeWeakDead(rc);
 				if (Clock.getRoundNum()<1800){
 					if (rc.getLocation().distanceSquaredTo(rc.senseEnemyHQLocation())>500){
-						moveTowards(rc, rc.senseEnemyHQLocation());
+						safeMoveTowards(rc, rc.senseEnemyHQLocation());
 					}
 					else{
 						randMove(rc);
@@ -117,6 +131,34 @@ public class RobotPlayer{
 		else if(rc.isCoreReady()&&rc.canMove(rc.getLocation().directionTo(location).rotateRight().rotateRight())){
 			rc.move(rc.getLocation().directionTo(location).rotateRight().rotateRight());
 		}	
+	}
+
+	private static void safeMoveTowards(RobotController rc, MapLocation location) throws GameActionException {
+		if(rc.isCoreReady()&&rc.canMove(rc.getLocation().directionTo(location))&&isSafe(rc,rc.getLocation().add(rc.getLocation().directionTo(location)))){
+			rc.move(rc.getLocation().directionTo(location));
+		}	
+		else if(rc.isCoreReady()&&rc.canMove(rc.getLocation().directionTo(location).rotateLeft())&&isSafe(rc,rc.getLocation().add(rc.getLocation().directionTo(location).rotateLeft()))){
+			rc.move(rc.getLocation().directionTo(location).rotateLeft());
+		}	
+		else if(rc.isCoreReady()&&rc.canMove(rc.getLocation().directionTo(location).rotateRight())&&isSafe(rc,rc.getLocation().add(rc.getLocation().directionTo(location).rotateRight()))){
+			rc.move(rc.getLocation().directionTo(location).rotateRight());
+		}	
+		else if(rc.isCoreReady()&&rc.canMove(rc.getLocation().directionTo(location).rotateLeft().rotateLeft())&&isSafe(rc,rc.getLocation().add(rc.getLocation().directionTo(location).rotateLeft().rotateLeft()))){
+			rc.move(rc.getLocation().directionTo(location).rotateLeft().rotateLeft());
+		}	
+		else if(rc.isCoreReady()&&rc.canMove(rc.getLocation().directionTo(location).rotateRight().rotateRight())&&isSafe(rc,rc.getLocation().add(rc.getLocation().directionTo(location).rotateRight().rotateRight()))){
+			rc.move(rc.getLocation().directionTo(location).rotateRight().rotateRight());
+		}	
+	}
+	
+	private static boolean isSafe(RobotController rc, MapLocation location) {
+		boolean safe = true;
+		for(MapLocation tower:rc.senseEnemyTowerLocations()){
+			if(rc.getLocation().add(facing).distanceSquaredTo(tower)<=RobotType.TOWER.attackRadiusSquared+2){
+				safe = false;
+			}
+		}
+		return safe;
 	}
 
 	private static void giveSuppies(RobotController rc) throws GameActionException {
@@ -175,6 +217,22 @@ public class RobotPlayer{
 		if(robotsToKill.length > 0){
 			if(rc.isWeaponReady() == true && rc.canAttackLocation(robotsToKill[0].location)){
 				rc.attackLocation(robotsToKill[0].location);
+			}
+		}
+	}
+	public static void makeWeakDead(RobotController rc) throws GameActionException{
+		RobotInfo[] robotsToKill = rc.senseNearbyRobots(rc.getType().attackRadiusSquared,rc.getTeam().opponent());
+		if(robotsToKill.length > 0){
+			MapLocation killHere = null;
+			double health = 9999;
+			for (RobotInfo robot:robotsToKill){
+				if(robot.health < health){
+					health = robot.health;
+					killHere = robot.location;
+				}
+			}
+			if(rc.isWeaponReady() == true && rc.canAttackLocation(killHere)){
+				rc.attackLocation(killHere);
 			}
 		}
 	}
